@@ -49,6 +49,16 @@ FLAT_CLASS = 0
 BUY_CLASS = 1
 CLASS_ORDER = [SELL_CLASS, FLAT_CLASS, BUY_CLASS]
 
+ENC_SELL_CLASS = 0
+ENC_FLAT_CLASS = 1
+ENC_BUY_CLASS = 2
+CLASS_TO_ENC = {
+    SELL_CLASS: ENC_SELL_CLASS,
+    FLAT_CLASS: ENC_FLAT_CLASS,
+    BUY_CLASS: ENC_BUY_CLASS,
+}
+ENC_TO_CLASS = {v: k for k, v in CLASS_TO_ENC.items()}
+
 
 def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.DataFrame:
     if mt5 is None:
@@ -87,7 +97,6 @@ def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.Data
         mt5.shutdown()
 
 
-
 def load_rates_from_csv(csv_path: Path) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
     expected = {"time", "open", "high", "low", "close"}
@@ -101,7 +110,6 @@ def load_rates_from_csv(csv_path: Path) -> pd.DataFrame:
     df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
     df = df.dropna(subset=["time"]).copy()
     return df[["time", "open", "high", "low", "close", "volume"]]
-
 
 
 def build_features(df: pd.DataFrame, horizon_bars: int) -> pd.DataFrame:
@@ -136,7 +144,6 @@ def build_features(df: pd.DataFrame, horizon_bars: int) -> pd.DataFrame:
     return df
 
 
-
 def split_train_test(df: pd.DataFrame, train_ratio: float) -> Tuple[pd.DataFrame, pd.DataFrame]:
     if not 0.50 <= train_ratio < 0.95:
         raise ValueError("train_ratio trebuie sa fie intre 0.50 si 0.95")
@@ -148,11 +155,9 @@ def split_train_test(df: pd.DataFrame, train_ratio: float) -> Tuple[pd.DataFrame
     return train_df, test_df
 
 
-
 def compute_return_barrier(train_df: pd.DataFrame, label_quantile: float) -> float:
     barrier = float(train_df["fwd_ret_h"].abs().quantile(label_quantile))
     return max(barrier, 1e-6)
-
 
 
 def label_targets(df: pd.DataFrame, return_barrier: float) -> pd.DataFrame:
@@ -161,8 +166,8 @@ def label_targets(df: pd.DataFrame, return_barrier: float) -> pd.DataFrame:
     out.loc[out["fwd_ret_h"] > return_barrier, "target_class"] = BUY_CLASS
     out.loc[out["fwd_ret_h"] < -return_barrier, "target_class"] = SELL_CLASS
     out["target_class"] = out["target_class"].astype(np.int64)
+    out["target_class_enc"] = out["target_class"].map(CLASS_TO_ENC).astype(np.int64)
     return out
-
 
 
 def make_classifier(random_state: int = 42) -> XGBClassifier:
@@ -185,10 +190,8 @@ def make_classifier(random_state: int = 42) -> XGBClassifier:
     )
 
 
-
 def class_index_map(model: XGBClassifier) -> Dict[int, int]:
-    return {int(cls): idx for idx, cls in enumerate(model.classes_)}
-
+    return {ENC_TO_CLASS[int(cls)]: idx for idx, cls in enumerate(model.classes_)}
 
 
 def derive_decision_thresholds(
@@ -229,10 +232,10 @@ def derive_decision_thresholds(
             "best_direction_prob": best_direction_prob,
             "best_vs_next": best_vs_next,
             "target_class": train_df["target_class"].to_numpy(),
+            "target_class_enc": train_df["target_class_enc"].to_numpy(),
         }
     )
     return entry_prob_threshold, min_prob_gap, diag
-
 
 
 def classify_with_thresholds(
@@ -251,6 +254,7 @@ def classify_with_thresholds(
 
     best_direction_prob = np.maximum(p_buy, p_sell)
     direction = np.where(p_buy >= p_sell, BUY_CLASS, SELL_CLASS)
+
     second_best = np.maximum(p_flat, np.where(direction == BUY_CLASS, p_sell, p_buy))
     prob_gap = best_direction_prob - second_best
 
@@ -271,7 +275,6 @@ def classify_with_thresholds(
         | ((out["pred_class"] == SELL_CLASS) & (out["target_class"] == SELL_CLASS))
     )
     return out
-
 
 
 def summarize_predictions(pred_df: pd.DataFrame) -> Dict[str, float]:
@@ -308,7 +311,6 @@ def summarize_predictions(pred_df: pd.DataFrame) -> Dict[str, float]:
     }
 
 
-
 def walk_forward_report(
     train_df: pd.DataFrame,
     n_splits: int,
@@ -317,7 +319,6 @@ def walk_forward_report(
     margin_quantile: float,
 ) -> Dict[str, float]:
     X = train_df[FEATURE_COLS].astype(np.float32)
-    y_ret = train_df["fwd_ret_h"].astype(np.float32)
 
     tscv = TimeSeriesSplit(n_splits=n_splits)
     accepted_rates: List[float] = []
@@ -337,7 +338,10 @@ def walk_forward_report(
         fold_valid = label_targets(fold_valid, barrier)
 
         model = make_classifier(random_state=42 + fold)
-        model.fit(fold_train[FEATURE_COLS].astype(np.float32), fold_train["target_class"].astype(np.int64))
+        model.fit(
+            fold_train[FEATURE_COLS].astype(np.float32),
+            fold_train["target_class_enc"].astype(np.int64),
+        )
 
         entry_prob_threshold, min_prob_gap, _ = derive_decision_thresholds(
             model, fold_train, prob_quantile=prob_quantile, margin_quantile=margin_quantile
@@ -370,17 +374,15 @@ def walk_forward_report(
     }
 
 
-
 def export_to_onnx(model: XGBClassifier, output_path: Path) -> None:
     initial_types = [("input", FloatTensorType([1, len(FEATURE_COLS)]))]
-    onx = convert_lightgbm(
+    onx = convert_xgboost(
         model,
         initial_types=initial_types,
         target_opset=15,
         zipmap=False,
     )
     output_path.write_bytes(onx.SerializeToString())
-
 
 
 def save_metadata(
@@ -411,6 +413,7 @@ def save_metadata(
         "min_prob_gap": min_prob_gap,
         "features": FEATURE_COLS,
         "class_order": CLASS_ORDER,
+        "class_encoding": {"sell": 0, "flat": 1, "buy": 2},
         "model_type": "XGBoostClassifier",
         "train_window_utc": {"start": train_start, "end": train_end},
         "test_window_utc": {"start": test_start, "end": test_end},
@@ -419,7 +422,6 @@ def save_metadata(
         "test_summary": test_summary,
     }
     (output_dir / "model_metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-
 
 
 def write_run_in_mt5(
@@ -459,7 +461,6 @@ PASII:
     (output_dir / "run_in_mt5.txt").write_text(txt, encoding="utf-8")
 
 
-
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Antreneaza un model XGBoost pentru MT5 si exporta ONNX.")
     p.add_argument("--symbol", default="XAGUSD", help="Simbolul folosit la training")
@@ -474,7 +475,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--margin-quantile", type=float, default=0.65, help="Cuantila gap-ului dintre probabilitati pe train")
     p.add_argument("--walk-forward-splits", type=int, default=5, help="Numar de split-uri TimeSeriesSplit")
     return p.parse_args()
-
 
 
 def main() -> None:
@@ -518,7 +518,10 @@ def main() -> None:
     test_lab = label_targets(test_df, barrier)
 
     model = make_classifier(random_state=42)
-    model.fit(train_lab[FEATURE_COLS].astype(np.float32), train_lab["target_class"].astype(np.int64))
+    model.fit(
+        train_lab[FEATURE_COLS].astype(np.float32),
+        train_lab["target_class_enc"].astype(np.int64),
+    )
 
     entry_prob_threshold, min_prob_gap, train_diag = derive_decision_thresholds(
         model,
