@@ -380,7 +380,6 @@ def export_to_onnx(model: XGBClassifier, output_path: Path) -> None:
         model,
         initial_types=initial_types,
         target_opset=15,
-        zipmap=False,
     )
     output_path.write_bytes(onx.SerializeToString())
 
