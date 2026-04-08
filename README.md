@@ -1,7 +1,5 @@
 # MT5 + XGBoost + ONNX
 
-Acest pachet este urmatorul pas dupa varianta LightGBM.
-
 Contine:
 - `train_mt5_xgboost_classifier.py` — script Python pentru training, split cronologic train/test, etichetare pe 3 clase si export ONNX
 - `MT5_XGBoost_Classifier_ONNX_Strategy.mq5` — EA MQL5 pentru Strategy Tester si rulare in MT5
