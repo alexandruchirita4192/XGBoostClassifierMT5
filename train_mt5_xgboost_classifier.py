@@ -200,7 +200,7 @@ def derive_decision_thresholds(
     prob_quantile: float,
     margin_quantile: float,
 ) -> Tuple[float, float, pd.DataFrame]:
-    X_train = train_df[FEATURE_COLS].astype(np.float32)
+    X_train = train_df[FEATURE_COLS].to_numpy(dtype=np.float32)
     proba = model.predict_proba(X_train)
     colmap = class_index_map(model)
 
@@ -244,7 +244,7 @@ def classify_with_thresholds(
     entry_prob_threshold: float,
     min_prob_gap: float,
 ) -> pd.DataFrame:
-    X = df[FEATURE_COLS].astype(np.float32)
+    X = df[FEATURE_COLS].to_numpy(dtype=np.float32)
     proba = model.predict_proba(X)
     colmap = class_index_map(model)
 
@@ -318,7 +318,7 @@ def walk_forward_report(
     prob_quantile: float,
     margin_quantile: float,
 ) -> Dict[str, float]:
-    X = train_df[FEATURE_COLS].astype(np.float32)
+    X = train_df[FEATURE_COLS].to_numpy(dtype=np.float32)
 
     tscv = TimeSeriesSplit(n_splits=n_splits)
     accepted_rates: List[float] = []
@@ -339,8 +339,8 @@ def walk_forward_report(
 
         model = make_classifier(random_state=42 + fold)
         model.fit(
-            fold_train[FEATURE_COLS].astype(np.float32),
-            fold_train["target_class_enc"].astype(np.int64),
+            fold_train[FEATURE_COLS].to_numpy(dtype=np.float32),
+            fold_train["target_class_enc"].to_numpy(dtype=np.int64),
         )
 
         entry_prob_threshold, min_prob_gap, _ = derive_decision_thresholds(
@@ -518,8 +518,8 @@ def main() -> None:
 
     model = make_classifier(random_state=42)
     model.fit(
-        train_lab[FEATURE_COLS].astype(np.float32),
-        train_lab["target_class_enc"].astype(np.int64),
+        train_lab[FEATURE_COLS].to_numpy(dtype=np.float32),
+        train_lab["target_class_enc"].to_numpy(dtype=np.int64),
     )
 
     entry_prob_threshold, min_prob_gap, train_diag = derive_decision_thresholds(
