@@ -19,7 +19,7 @@ try:
     from xgboost import XGBClassifier
 except Exception as exc:  # pragma: no cover
     raise RuntimeError(
-        "Lipseste pachetul xgboost. Instaleaza-l cu: pip install xgboost"
+        "Missing xgboost package. Install it with: pip install xgboost"
     ) from exc
 
 try:
@@ -27,7 +27,7 @@ try:
     from onnxmltools.convert.common.data_types import FloatTensorType
 except Exception as exc:  # pragma: no cover
     raise RuntimeError(
-        "Lipseste pachetul onnxmltools. Instaleaza-l cu: pip install onnxmltools onnxconverter-common"
+        "Missing onnxmltools package. Install it with: pip install onnxmltools onnxconverter-common"
     ) from exc
 
 
@@ -63,7 +63,7 @@ ENC_TO_CLASS = {v: k for k, v in CLASS_TO_ENC.items()}
 def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.DataFrame:
     if mt5 is None:
         raise RuntimeError(
-            "Pachetul MetaTrader5 pentru Python nu este instalat. Instaleaza-l cu: pip install MetaTrader5"
+            "The MetaTrader5 package for Python is not installed. Install it with: pip install MetaTrader5"
         )
 
     timeframe_map = {
@@ -76,16 +76,16 @@ def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.Data
         "D1": mt5.TIMEFRAME_D1,
     }
     if timeframe_name not in timeframe_map:
-        raise ValueError(f"Timeframe nesuportat: {timeframe_name}")
+        raise ValueError(f"Unsupported timeframe: {timeframe_name}")
 
     if not mt5.initialize():
-        raise RuntimeError(f"initialize() a esuat: {mt5.last_error()}")
+        raise RuntimeError(f"initialize() failed: {mt5.last_error()}")
 
     try:
         rates = mt5.copy_rates_from_pos(symbol, timeframe_map[timeframe_name], 0, bars)
         if rates is None or len(rates) == 0:
             raise RuntimeError(
-                f"Nu am putut citi datele pentru {symbol} {timeframe_name}. last_error={mt5.last_error()}"
+                f"Could not read data for {symbol} {timeframe_name}. last_error={mt5.last_error()}"
             )
         df = pd.DataFrame(rates)
         df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
@@ -102,7 +102,7 @@ def load_rates_from_csv(csv_path: Path) -> pd.DataFrame:
     expected = {"time", "open", "high", "low", "close"}
     missing = expected - set(df.columns)
     if missing:
-        raise ValueError(f"CSV-ul nu contine coloanele obligatorii: {sorted(missing)}")
+        raise ValueError(f"CSV does not contain mandatory columns: {sorted(missing)}")
 
     if "volume" not in df.columns:
         df["volume"] = 0.0
@@ -146,12 +146,12 @@ def build_features(df: pd.DataFrame, horizon_bars: int) -> pd.DataFrame:
 
 def split_train_test(df: pd.DataFrame, train_ratio: float) -> Tuple[pd.DataFrame, pd.DataFrame]:
     if not 0.50 <= train_ratio < 0.95:
-        raise ValueError("train_ratio trebuie sa fie intre 0.50 si 0.95")
+        raise ValueError("train_ratio needs to be between 0.50 and 0.95")
     split_idx = int(len(df) * train_ratio)
     train_df = df.iloc[:split_idx].copy()
     test_df = df.iloc[split_idx:].copy()
     if len(train_df) < 1500 or len(test_df) < 250:
-        raise ValueError("Prea putine exemple dupa split. Mareste numarul de bare sau ajusteaza train_ratio.")
+        raise ValueError("Too few examples after split. Increase the number of bars or adjust train_ratio.")
     return train_df, test_df
 
 
@@ -433,10 +433,10 @@ def write_run_in_mt5(
     entry_prob_threshold: float,
     min_prob_gap: float,
 ) -> None:
-    txt = f"""MODEL: XGBoostClassifier (3 clase)
-SIMBOL: {args.symbol}
+    txt = f"""MODEL: XGBoostClassifier (3 classes)
+SYMBOL: {args.symbol}
 TIMEFRAME: {args.timeframe}
-ORIZONT TARGET (bare): {args.horizon_bars}
+HORIZON TARGET (bars): {args.horizon_bars}
 
 TRAIN UTC:
   start: {train_start}
@@ -446,33 +446,33 @@ TEST UTC:
   start: {test_start}
   end  : {test_end}
 
-INPUTURI RECOMANDATE PENTRU EA:
+RECOMMENDED INPUTS FOR EA:
   InpEntryProbThreshold = {entry_prob_threshold:.6f}
   InpMinProbGap        = {min_prob_gap:.6f}
   InpMaxBarsInTrade    = {args.horizon_bars}
 
-PASII:
-1. Copiaza fisierul ml_strategy_classifier_xgboost.onnx langa EA-ul .mq5.
-2. Recompileaza EA-ul in MetaEditor.
-3. Ruleaza Strategy Tester DOAR pe fereastra TEST UTC de mai sus.
-4. Pentru filtre suplimentare de trend/ATR, porneste de la setarile care au mers mai bine in testele anterioare.
+STEPS:
+1. Copy the ml_strategy_classifier_xgboost.onnx file next to the .mq5 EA.
+2. Recompile the EA in MetaEditor.
+3. Run Strategy Tester ONLY on the TEST UTC window above.
+4. For additional trend/ATR filters, start from the settings that worked better in previous tests.
 """
     (output_dir / "run_in_mt5.txt").write_text(txt, encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Antreneaza un model XGBoost pentru MT5 si exporta ONNX.")
-    p.add_argument("--symbol", default="XAGUSD", help="Simbolul folosit la training")
+    p = argparse.ArgumentParser(description="Train an XGBoost model for MT5 and export ONNX.")
+    p.add_argument("--symbol", default="XAGUSD", help="Symbol used for training")
     p.add_argument("--timeframe", default="M15", help="M1/M5/M15/M30/H1/H4/D1")
-    p.add_argument("--bars", type=int, default=20000, help="Numar de bare de citit din MT5")
-    p.add_argument("--csv", type=str, default="", help="Alternativ, citeste datele din CSV")
-    p.add_argument("--output-dir", default="output_xgboost", help="Directorul de output")
-    p.add_argument("--horizon-bars", type=int, default=8, help="Orizontul target-ului in bare inchise")
-    p.add_argument("--train-ratio", type=float, default=0.70, help="Procent cronologic pentru train")
-    p.add_argument("--label-quantile", type=float, default=0.67, help="Cuantila abs(fwd_ret_h) pentru etichetare")
-    p.add_argument("--prob-quantile", type=float, default=0.80, help="Cuantila probabilitatii de intrare pe train")
-    p.add_argument("--margin-quantile", type=float, default=0.65, help="Cuantila gap-ului dintre probabilitati pe train")
-    p.add_argument("--walk-forward-splits", type=int, default=5, help="Numar de split-uri TimeSeriesSplit")
+    p.add_argument("--bars", type=int, default=20000, help="Number of bars to read from MT5")
+    p.add_argument("--csv", type=str, default="", help="Alternatively, read data from CSV")
+    p.add_argument("--output-dir", default="output_xgboost", help="Output directory")
+    p.add_argument("--horizon-bars", type=int, default=8, help="Target horizon in closed bars")
+    p.add_argument("--train-ratio", type=float, default=0.70, help="Chronological percentage for train")
+    p.add_argument("--label-quantile", type=float, default=0.67, help="Quantile of abs(fwd_ret_h) for labeling")
+    p.add_argument("--prob-quantile", type=float, default=0.80, help="Quantile of entry probability on train")
+    p.add_argument("--margin-quantile", type=float, default=0.65, help="Quantile of gap between probabilities on train")
+    p.add_argument("--walk-forward-splits", type=int, default=5, help="Number of TimeSeriesSplit splits")
     return p.parse_args()
 
 
@@ -509,7 +509,7 @@ def main() -> None:
         prob_quantile=args.prob_quantile,
         margin_quantile=args.margin_quantile,
     )
-    print("\nRezumat walk-forward pe train:")
+    print("\nWalk-forward summary on train:")
     print(json.dumps(walk_forward, indent=2))
 
     barrier = compute_return_barrier(train_df, args.label_quantile)
@@ -539,9 +539,9 @@ def main() -> None:
     train_summary = summarize_predictions(train_pred)
     test_summary = summarize_predictions(test_pred)
 
-    print(f"\nBariera de etichetare abs(fwd_ret_h): {barrier:.8f}")
-    print(f"Prag probabilitate intrare derivat din predictii train: {entry_prob_threshold:.6f}")
-    print(f"Prag diferenta probabilitati derivat din predictii train: {min_prob_gap:.6f}")
+    print(f"\nLabel barrier abs(fwd_ret_h): {barrier:.8f}")
+    print(f"Entry probability threshold derived from train predictions: {entry_prob_threshold:.6f}")
+    print(f"Minimum probability gap derived from train predictions: {min_prob_gap:.6f}")
 
     print("\nTrain summary:")
     print(json.dumps(train_summary, indent=2))
@@ -577,11 +577,11 @@ def main() -> None:
         min_prob_gap=min_prob_gap,
     )
 
-    print(f"\nModel ONNX salvat in: {onnx_path}")
-    print(f"Foloseste in EA InpEntryProbThreshold = {entry_prob_threshold:.6f}")
-    print(f"Foloseste in EA InpMinProbGap        = {min_prob_gap:.6f}")
-    print(f"Foloseste in EA InpMaxBarsInTrade    = {args.horizon_bars}")
-    print("Citeste si fisierul run_in_mt5.txt din output pentru fereastra exacta de test.")
+    print(f"\nONNX model saved in: {onnx_path}")
+    print(f"Use in EA InpEntryProbThreshold = {entry_prob_threshold:.6f}")
+    print(f"Use in EA InpMinProbGap        = {min_prob_gap:.6f}")
+    print(f"Use in EA InpMaxBarsInTrade    = {args.horizon_bars}")
+    print("Also read the run_in_mt5.txt file from output for the exact test window.")
 
 
 if __name__ == "__main__":

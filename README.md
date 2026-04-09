@@ -1,10 +1,10 @@
 # MT5 + XGBoost + ONNX
 
-Contine:
-- `train_mt5_xgboost_classifier.py` — script Python pentru training, split cronologic train/test, etichetare pe 3 clase si export ONNX
-- `MT5_XGBoost_Classifier_ONNX_Strategy.mq5` — EA MQL5 pentru Strategy Tester si rulare in MT5
+Contains:
+- `train_mt5_xgboost_classifier.py` — Python script for training, chronological train/test split, labeling on 3 classes and ONNX export
+- `MT5_XGBoost_Classifier_ONNX_Strategy.mq5` — MQL5 EA for Strategy Tester and running in MT5
 
-## 1. Pachete Python necesare
+## 1. Required Python packages
 
 In PowerShell:
 
@@ -15,7 +15,7 @@ python -m pip install --upgrade pip
 pip install MetaTrader5 pandas numpy scikit-learn xgboost onnxmltools onnx onnxconverter-common
 ```
 
-## 2. Comenzi recomandate
+## 2. Recommended commands
 
 ```powershell
 python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --output-dir output_xgb_h8
@@ -23,26 +23,26 @@ python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 20
 python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 12 --train-ratio 0.70 --output-dir output_xgb_h12
 ```
 
-## 3. Fisiere rezultate
+## 3. Result files
 
-In folderul de output vei avea, intre altele:
+In the output folder you will have, among others:
 - `ml_strategy_classifier_xgboost.onnx`
 - `model_metadata.json`
 - `run_in_mt5.txt`
 - `train_predictions_snapshot.csv`
 - `test_predictions_snapshot.csv`
 
-## 4. Cum rulezi in MT5
+## 4. How to run in MT5
 
-1. Copiezi `ml_strategy_classifier_xgboost.onnx` in acelasi folder cu `MT5_XGBoost_Classifier_ONNX_Strategy.mq5`
-2. Recompilezi EA-ul in MetaEditor
-3. Deschizi `run_in_mt5.txt`
-4. In Strategy Tester setezi exact fereastra `TEST UTC`
-5. Introduci in inputuri valorile recomandate
+1. Copy `ml_strategy_classifier_xgboost.onnx` to the same folder as `MT5_XGBoost_Classifier_ONNX_Strategy.mq5`
+2. Recompile the EA in MetaEditor
+3. Open `run_in_mt5.txt`
+4. In Strategy Tester set exactly the `TEST UTC` window
+5. Enter the recommended values in the inputs
 
-## 5. Set de plecare pentru filtre in EA
+## 5. Starting set for filters in EA
 
-Porneste de la benchmark-ul tau actual:
+Start from your current benchmark:
 
 ```text
 InpEntryProbThreshold = 0.60
@@ -59,6 +59,6 @@ InpAtrMaxPercentile   = 0.85
 InpUseKillSwitch      = false
 ```
 
-## 6. Observatie importanta
+## 6. Important note
 
-Ca si la LightGBM, primul output ONNX este eticheta (`int64`), iar al doilea este tensorul de probabilitati. EA-ul este deja scris pentru acest format.
+Like LightGBM, the first ONNX output is the label (`int64`), and the second is the probability tensor. The EA is already written for this format.
