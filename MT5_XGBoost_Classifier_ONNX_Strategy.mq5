@@ -807,3 +807,28 @@ void OnTick()
    if(filtered_signal == SIGNAL_BUY || filtered_signal == SIGNAL_SELL)
       OpenTrade(filtered_signal, atr14);
   }
+
+double OnTester() {
+  double profit = TesterStatistics(STAT_PROFIT);
+  double pf = TesterStatistics(STAT_PROFIT_FACTOR);
+  double recovery = TesterStatistics(STAT_RECOVERY_FACTOR);
+  double dd_percent = TesterStatistics(STAT_EQUITY_DDREL_PERCENT);
+  double trades = TesterStatistics(STAT_TRADES);
+
+  // Penalty if there are too few transactions
+  double trade_penalty = 1.0;
+  if (trades < 20)
+    trade_penalty = 0.25;
+  else if (trades < 50)
+    trade_penalty = 0.60;
+
+  // Robust score, not only brut profit
+  double score = 0.0;
+
+  if (dd_percent >= 0.0)
+    score =
+        (profit * MathMax(pf, 0.01) * MathMax(recovery, 0.01) * trade_penalty) /
+        (1.0 + dd_percent);
+
+  return score;
+}
