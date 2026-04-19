@@ -18,9 +18,9 @@ pip install MetaTrader5 pandas numpy scikit-learn xgboost onnxmltools onnx onnxc
 ## 2. Recommended commands
 
 ```powershell
-python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --output-dir output_xgb_h8
-python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 4 --train-ratio 0.70 --output-dir output_xgb_h4
-python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 12 --train-ratio 0.70 --output-dir output_xgb_h12
+python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 80000 --horizon-bars 8 --train-ratio 0.70 --output-dir output_xgb_XAGUSD_M15_h8
+python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 80000 --horizon-bars 4 --train-ratio 0.70 --output-dir output_xgb_XAGUSD_M15_h4
+python train_mt5_xgboost_classifier.py --symbol XAGUSD --timeframe M15 --bars 80000 --horizon-bars 12 --train-ratio 0.70 --output-dir output_xgb_XAGUSD_M15_h12
 ```
 
 ## 3. Result files
